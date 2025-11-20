@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ocean GenAI — Agentic RAG (Static HTML)</title>
+  <style>
+    /* Minimal CSS ported from your React layout (dark mode by default) */
+    :root{--bg:#0b1020;--card:#0f1724;--muted:#9aa4b2;--accent:#3aa0ff;--accent-2:#36d399;--glass:rgba(255,255,255,0.03)}
+    body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:#e6eef6}
+    .app-container{display:flex;flex-direction:column;min-height:100vh}
+    .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(90deg,rgba(255,255,255,0.02),transparent);box-shadow:0 1px 0 rgba(255,255,255,0.02)}
+    .logo{font-weight:700;letter-spacing:0.6px}
+    .nav-links a{margin-right:12px;color:var(--muted);text-decoration:none}
+    .nav-links .active-link{color:#fff}
+    .header-actions{display:flex;gap:10px;align-items:center}
+    .btn{background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit;padding:8px 12px;border-radius:8px;cursor:pointer}
+    .btn.primary{background:linear-gradient(90deg,var(--accent),#6db8ff);color:#072033;border:none}
+    .btn.sign-in{background:transparent}
+    .main-layout-v2{display:grid;grid-template-columns:320px 1fr 360px;gap:18px;padding:20px}
+    .sidebar,.chat-area,.analysis-area{min-height:60vh}
+    .card{background:linear-gradient(180deg,var(--card),rgba(255,255,255,0.02));padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,0.5)}
+    .input-card .styled-file-input{width:100%;padding:8px}
+    .doc-analysis-list{max-height:220px;overflow:auto;margin-top:10px}
+    .doc-analysis-item{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.02);margin-bottom:8px;background:var(--glass)}
+    .status-Pending{color:var(--muted)}
+    .status-Analyzing{color:#ffd166}
+    .status-Completed{color:#a3ffb0}
+    .chat-window{height:340px;overflow:auto;padding:8px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
+    .chat-message{margin-bottom:8px}
+    .chat-message.user .sender-tag{color:#9bd0ff}
+    .chat-message.bot .sender-tag{color:#a8ffd1}
+    .chat-input-row{display:flex;gap:8px;margin-top:12px}
+    input.styled-input{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;width:100%}
+    .tab-bar{display:flex;gap:8px;margin-bottom:10px}
+    .tab-btn{padding:8px 10px;border-radius:8px;border:none;background:rgba(255,255,255,0.02);cursor:pointer}
+    .tab-btn.active{background:linear-gradient(90deg,var(--accent),#6db8ff);color:#001422}
+    pre.code-block{background:#071726;padding:12px;border-radius:8px;color:#bfe4ff;overflow:auto}
+    .icon-placeholder{opacity:0.9;margin-right:6px}
+    .feedback-stars .star{cursor:pointer;margin-right:4px}
+    .center-text{text-align:center;color:var(--muted)}
+    /* small responsive tweak */
+    @media (max-width:1100px){.main-layout-v2{grid-template-columns:1fr}.analysis-area{order:3}}
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <div class="logo">Ocean GenAI</div>
+      <nav class="nav-links">
+        <a href="#">Home</a>
+        <a href="#" class="active-link">ChatBot</a>
+        <a href="#">Explore</a>
+      </nav>
+      <div class="header-actions">
+        <label title="Toggle Dark/Light Mode">
+          <input id="mode-toggle" type="checkbox" checked />
+        </label>
+        <button class="btn btn-icon">🔔</button>
+        <button id="btn-signin" class="btn btn-sign-in">Sign In</button>
+      </div>
+    </header>
+
+    <main class="main-layout-v2">
+      <!-- LEFT -->
+      <aside class="sidebar">
+        <div class="card input-card">
+          <h4>Data Ingestion</h4>
+          <label>Upload Documents (max 5)</label>
+          <input id="file-input" type="file" multiple />
+
+          <label style="display:block;margin-top:10px">Scrape URLs</label>
+          <input id="scrape-urls" class="styled-input" placeholder="URLs (comma separated)" />
+          <button id="btn-scrape" class="btn" style="margin-top:8px">Scrape</button>
+
+          <div style="margin-top:12px">
+            <button id="btn-submit" class="btn primary">Submit Documents for Analysis</button>
+          </div>
+        </div>
+
+        <div class="card analysis-card" style="margin-top:12px">
+          <h4>Document Analysis</h4>
+          <input id="filter-input" class="styled-input" placeholder="Filter documents..." />
+          <div id="doc-list" class="doc-analysis-list"><p class="center-text">No documents uploaded.</p></div>
+        </div>
+
+        <div class="card output-actions-card" style="margin-top:12px">
+          <h4>Output Actions</h4>
+          <button id="btn-download" class="btn">Download Output Zip</button>
+          <button id="btn-push" class="btn">Push to Global Memory</button>
+        </div>
+      </aside>
+
+      <!-- MIDDLE -->
+      <section class="chat-area">
+        <div class="card sources-card">
+          <h3>Sources</h3>
+          <p id="sources-placeholder" class="center-text">No analysis available. Upload and submit documents to see sources.</p>
+        </div>
+
+        <div class="card chat-card" style="margin-top:12px">
+          <h3>Agent Answer</h3>
+          <div id="chat-window" class="chat-window"></div>
+          <div class="chat-input-row">
+            <input id="chat-input" class="styled-input chat-input" placeholder="Ask a question about your documents..." />
+            <button id="btn-send" class="btn primary">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT -->
+      <section class="analysis-area">
+        <div class="card agent-output-card">
+          <h3>Agent Output</h3>
+          <div class="tab-bar">
+            <button class="tab-btn active" data-tab="preview">Preview</button>
+            <button class="tab-btn" data-tab="code">Code</button>
+            <button class="tab-btn" data-tab="visual">Visualization</button>
+          </div>
+          <div id="tab-content" class="tab-content">
+            <div id="preview" class="output-content">
+              <h4>Important News</h4>
+              <ul id="preview-news"></ul>
+            </div>
+            <div id="code" style="display:none"><pre id="code-block" class="code-block"></pre></div>
+            <div id="visual" style="display:none"><div class="chart-placeholder-v2">Chart/Graph Output</div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    /*
+      agentic_rag_ui.html
+      - This single-file HTML implements the same visual layout & behaviours as the React version
+      - It expects a backend HTTP API. Below are the JS functions that call the API endpoints.
+
+      IMPORTANT: Replace API_BASE with your server URL and make sure CORS is enabled server-side.
+    */
+
+    const API_BASE = location.origin + '/api'; // change if backend served elsewhere
+    const API_KEY = 'test123'; // optional header key
+
+    // --- Utility ---
+    const el = (id) => document.getElementById(id);
+    const chatWindow = el('chat-window');
+
+    // --- UI state ---
+    let selectedFiles = [];
+    let analysisResults = [];
+
+    // --- DOM wiring ---
+    el('file-input').addEventListener('change', (e) => {
+      selectedFiles = Array.from(e.target.files).slice(0,5);
+      renderDocList();
+    });
+
+    el('btn-submit').addEventListener('click', submitDocs);
+    el('btn-send').addEventListener('click', sendQuestion);
+    el('btn-scrape').addEventListener('click', scrapeUrls);
+    el('btn-download').addEventListener('click', downloadZip);
+    el('btn-push').addEventListener('click', pushGlobalMemory);
+    el('filter-input').addEventListener('input', renderDocList);
+
+    // tabs
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        const tab = b.dataset.tab;
+        ['preview','code','visual'].forEach(t => el(t).style.display = (t===tab) ? 'block' : 'none');
+      })
+    })
+
+    // initial preview news + code snippet
+    const previewNews = [
+      'Global markets rally on economic optimism',
+      'New AI breakthrough announced in healthcare',
+      'Climate summit yields landmark agreements'
+    ];
+    const codeSnippet = `// Example report generation code snippet\nfunction generateReport(data) {\n  let summary = '';\n  data.forEach((item) => {\n    summary += `- ${item.fileName}: ${item.summary}\n`;\n  });\n  return summary;\n}`;
+
+    const previewList = el('preview-news');
+    previewNews.forEach(n => { const li = document.createElement('li'); li.textContent = n; previewList.appendChild(li); });
+    el('code-block').textContent = codeSnippet;
+
+    // --- Render document list ---
+    function renderDocList() {
+      const list = el('doc-list');
+      list.innerHTML = '';
+      const filter = el('filter-input').value.toLowerCase();
+      if (!selectedFiles.length) { list.innerHTML = '<p class="center-text">No documents uploaded.</p>'; return; }
+
+      selectedFiles.filter(f => f.name.toLowerCase().includes(filter)).forEach((file, idx) => {
+        const card = document.createElement('div'); card.className = 'doc-analysis-item';
+        card.innerHTML = `<div style="font-weight:600">${file.name}</div><div style="font-size:12px;color:var(--muted)">${(file.size/1024).toFixed(1)} KB</div><div style="margin-top:6px"><button class="btn" data-idx="${idx}">Remove</button></div>`;
+        list.appendChild(card);
+      });
+
+      list.querySelectorAll('.btn[data-idx]').forEach(b => b.addEventListener('click', (e)=>{
+        const i = Number(e.currentTarget.dataset.idx); selectedFiles.splice(i,1); renderDocList();
+      }));
+    }
+
+    // --- API calls (adapt to your backend endpoints) ---
+
+    async function submitDocs() {
+      if (!selectedFiles.length) return alert('Please select files.');
+
+      // Upload files to backend via /api/upload (expects multipart/form-data)
+      const fd = new FormData();
+      selectedFiles.forEach((f) => fd.append('files', f));
+
+      try {
+        setButtonLoading('btn-submit', true, 'Analyzing...');
+        const res = await fetch(API_BASE + '/upload', {
+          method: 'POST', body: fd, headers: { 'X-API-KEY': API_KEY }
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const payload = await res.json();
+
+        // payload expected: { job_id: "...", files: [{name, id}], status: 'started' }
+        analysisResults = payload.files.map(f => ({ fileName: f.name, status: 'Analyzing', summary:'', feedback:0 }));
+        renderDocList();
+
+        // Poll for completion (or switch to SSE/WebSocket)
+        pollJobStatus(payload.job_id);
+
+      } catch (err) {
+        console.error(err); alert('Upload failed: '+ err.message);
+      } finally { setButtonLoading('btn-submit', false); }
+    }
+
+    async function pollJobStatus(jobId) {
+      const interval = 2000;
+      const timer = setInterval(async () => {
+        try {
+          const res = await fetch(API_BASE + '/job_status?job_id=' + encodeURIComponent(jobId), { headers: {'X-API-KEY': API_KEY}});
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          // data expected: { status:'running'|'done', files: [{name, summary, status}] }
+          if (data.files) {
+            analysisResults = data.files.map(f => ({ fileName:f.name, status: f.status||'Completed', summary:f.summary||'', feedback:0 }));
+            renderDocListWithAnalysis();
+            if (data.status === 'done') { clearInterval(timer); }
+          }
+        } catch (err) {
+          console.error('poll err', err); clearInterval(timer);
+        }
+      }, interval);
+    }
+
+    function renderDocListWithAnalysis(){
+      const list = el('doc-list'); list.innerHTML='';
+      if (!analysisResults.length) return renderDocList();
+      analysisResults.forEach((a, idx) => {
+        const card = document.createElement('div'); card.className='doc-analysis-item';
+        card.innerHTML = `<div style="font-weight:600">${a.fileName}</div><div style="font-size:12px;color:var(--muted)">Status: <span class="status-${a.status}">${a.status}</span></div><div style="margin-top:8px">Summary: <div style="font-size:13px;color:var(--muted);max-height:60px;overflow:auto">${escapeHtml(a.summary||'—')}</div></div>`;
+        list.appendChild(card);
+      });
+    }
+
+    async function scrapeUrls(){
+      const value = el('scrape-urls').value.trim(); if(!value) return alert('Enter URLs');
+      try{
+        setButtonLoading('btn-scrape', true, 'Scraping...');
+        const res = await fetch(API_BASE + '/scrape', {method:'POST',headers: {'Content-Type':'application/json','X-API-KEY':API_KEY}, body: JSON.stringify({urls:value.split(',').map(u=>u.trim())})});
+        if(!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        alert('Scrape started. ' + (data.job_id ? 'Job: '+data.job_id : '')); 
+      }catch(err){console.error(err);alert('Scrape failed: '+err.message);} finally{setButtonLoading('btn-scrape', false);}
+    }
+
+    async function sendQuestion(){
+      const text = el('chat-input').value.trim(); if(!text) return;
+      appendChat('user', text); el('chat-input').value='';
+      setButtonLoading('btn-send', true);
+
+      // send question to /api/ask which should return { answer: '...' }
+      try{
+        const res = await fetch(API_BASE + '/ask', {method:'POST',headers:{'Content-Type':'application/json','X-API-KEY':API_KEY},body: JSON.stringify({question:text})});
+        if(!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        appendChat('bot', data.answer || 'No answer');
+      }catch(err){appendChat('bot', 'Error: '+ err.message);} finally{setButtonLoading('btn-send', false);}    }
+
+    async function downloadZip(){
+      try{
+        setButtonLoading('btn-download', true);
+        const res = await fetch(API_BASE + '/download', {headers: {'X-API-KEY':API_KEY}});
+        if(!res.ok) throw new Error('Download failed');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'submission.zip'; document.body.appendChild(a); a.click(); a.remove();
+      }catch(err){alert(err.message);} finally{setButtonLoading('btn-download', false);}    }
+
+    async function pushGlobalMemory(){
+      try{
+        setButtonLoading('btn-push', true);
+        const res = await fetch(API_BASE + '/push_memory', {method:'POST',headers:{'Content-Type':'application/json','X-API-KEY':API_KEY},body:JSON.stringify({})});
+        if(!res.ok) throw new Error(await res.text());
+        alert('Pushed to global memory');
+      }catch(err){alert('Push failed: '+ err.message);} finally{setButtonLoading('btn-push', false);}    }
+
+    function appendChat(sender, text){
+      const div = document.createElement('div'); div.className = `chat-message ${sender}`;
+      const tag = document.createElement('div'); tag.className = 'sender-tag'; tag.textContent = sender==='user' ? 'You' : 'OceanGenAI';
+      const msg = document.createElement('div'); msg.className='message-content'; msg.textContent = text;
+      div.appendChild(tag); div.appendChild(msg); chatWindow.appendChild(div); chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function setButtonLoading(id, loading, text){
+      const b = el(id); if(!b) return; if(loading){ b.dataset.orig = b.textContent; b.textContent = text || 'Working...'; b.disabled = true; } else { b.textContent = b.dataset.orig || 'Done'; b.disabled = false; setTimeout(()=>{ b.textContent = b.dataset.orig || 'Button'; }, 700); } }
+
+    function escapeHtml(s){ if(!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // --- small convenience: if user opens directly, add sample chat ---
+    appendChat('system', 'Ask a question to start the RAG process.');
+
+  </script>
+</body>
+</html>
